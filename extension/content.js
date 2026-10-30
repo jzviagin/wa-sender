@@ -29,15 +29,17 @@
   document.getElementById("wa-sender-host")?.remove();
   const host = document.createElement("div");
   host.id = "wa-sender-host";
-  host.style.cssText = "position:fixed;left:16px;bottom:16px;z-index:2147483647;";
+  host.style.cssText = "position:fixed;z-index:2147483647;";
   document.documentElement.appendChild(host);
   const root = host.attachShadow({ mode: "open" });
   root.innerHTML = `
     <style>
       * { box-sizing: border-box; font: 14px system-ui, sans-serif; }
-      .fab { width: 48px; height: 48px; border-radius: 50%; border: 0; cursor: pointer;
+      .wrap { display: flex; flex-direction: column; align-items: flex-start; }
+      .wrap.below { flex-direction: column-reverse; }
+      .fab { width: 40px; height: 40px; border-radius: 50%; border: 0; cursor: pointer;
              background: #25d366; box-shadow: 0 2px 8px rgba(0,0,0,.3); display: grid; place-items: center; }
-      .panel { display: none; width: 340px; max-height: calc(100vh - 90px); overflow-y: auto; margin-bottom: 10px;
+      .panel { display: none; width: 340px; max-height: calc(100vh - 90px); overflow-y: auto; margin: 10px 0;
                padding: 12px; border-radius: 10px; background: #fff; color: #111; box-shadow: 0 4px 20px rgba(0,0,0,.35); }
       .open .panel { display: block; }
       label { display: block; text-align: start; margin: 8px 0 3px; color: #555; font-size: 12px; }
@@ -66,11 +68,54 @@
         <div class="status" id="status"></div>
       </div>
       <button class="fab" id="fab" title="WA Sender">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="#fff"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>
       </button>
     </div>`;
   const $ = (id) => root.getElementById(id);
   const wrap = root.querySelector(".wrap");
+  const panel = root.querySelector(".panel");
+
+  // Sit next to the "WhatsApp" title in the chat list header, panel dropping
+  // down. We only float above WhatsApp's header, never insert into its DOM,
+  // so its re-renders can't remove or break the button. No title found:
+  // bottom-left corner with the panel opening upwards.
+  function findTitle() {
+    const left = innerWidth / 2;
+    const candidates = document.querySelectorAll('h1, [role="heading"], [aria-label^="WhatsApp"], [title^="WhatsApp"]');
+    for (const el of candidates) {
+      if (host.contains(el) || el.closest("#main")) continue;
+      const name = (el.textContent || el.getAttribute("aria-label") || el.getAttribute("title") || "").trim();
+      if (!/^WhatsApp( Business)?$/.test(name)) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width && r.height && r.height < 80 && r.left < left && r.top < 200) return el;
+    }
+    return null;
+  }
+
+  function place() {
+    const title = findTitle();
+    if (title) {
+      // Measure the text itself: the heading box may be wider than its text.
+      const range = document.createRange();
+      range.selectNodeContents(title);
+      const r = range.getBoundingClientRect().width ? range.getBoundingClientRect() : title.getBoundingClientRect();
+      const top = Math.round(r.top + r.height / 2 - 20);
+      host.style.left = Math.round(Math.min(r.right + 14, innerWidth - 360)) + "px";
+      host.style.top = top + "px";
+      host.style.bottom = "";
+      wrap.classList.add("below");
+      panel.style.maxHeight = Math.max(200, innerHeight - top - 70) + "px";
+    } else {
+      host.style.left = "16px";
+      host.style.top = "";
+      host.style.bottom = "16px";
+      wrap.classList.remove("below");
+      panel.style.maxHeight = "";
+    }
+  }
+  place();
+  setInterval(place, 500);
+  addEventListener("resize", place);
   const fieldInputs = () => [...$("fields").querySelectorAll("input")];
 
   // Keep WhatsApp's global keyboard shortcuts from stealing our keystrokes.
