@@ -1,4 +1,4 @@
-// Toolbar icon / Alt+Shift+W: toggle the panel in the WhatsApp window.
+// Toolbar icon / keyboard shortcut: toggle the panel in the WhatsApp window.
 // Also opens chats on request from the panel (see openChatInPage below).
 const WA_URL = "https://web.whatsapp.com/";
 
