@@ -46,13 +46,13 @@ the message uses a `{name}` that isn't listed in `params`.
 
 ## How it opens the chat
 
-1. **In place (fast):** it clicks WhatsApp's *New chat*, searches the number,
-   and clicks the result showing that number. No reload, same session.
-2. **Fallback:** if that doesn't work (WhatsApp changed its layout, or the
-   result shows a saved contact's name instead of the number), it reloads
-   **the same window** with WhatsApp's own `send?phone=…&text=…` link. That
-   takes a few seconds but keeps you logged in. WhatsApp fills in the message
-   and still waits for you to send.
+It never reloads WhatsApp. It tries these in order:
+
+1. **Direct:** asks WhatsApp Web's own code to open the chat for the number,
+   the same thing that happens when you click a chat.
+2. **Search:** clicks *New chat*, searches the number, and clicks the result.
+3. **Neither worked:** it copies the message to the clipboard and shows why each
+   way failed (the *Details* line). Open the chat yourself and paste.
 
 ## Phone normalization
 

@@ -176,22 +176,49 @@
     const digits = digitsOf(number);
     $("go").disabled = true;
     status("Opening chat…");
+    const failures = [];
     try {
-      if (await openChatInPlace(digits)) {
-        await fillComposer(text);
-        status(`Ready in chat with ${number} — review it and press Enter in WhatsApp.`);
-        wrap.classList.remove("open");
-        return;
+      for (const [label, open] of [["direct", openChatDirect], ["search", openChatInPlace]]) {
+        let result;
+        try {
+          result = await open(digits);
+        } catch (e) {
+          result = e.message;
+        }
+        if (result === true) {
+          await fillComposer(text);
+          status(`Ready in chat with ${number} — review it and press Enter in WhatsApp.`);
+          wrap.classList.remove("open");
+          return;
+        }
+        failures.push(`${label}: ${result}`);
       }
     } catch (e) {
-      console.warn("WA Sender: in-place open failed", e);
+      failures.push("fill: " + e.message);
     } finally {
       $("go").disabled = false;
     }
-    // Fallback: WhatsApp's own link, in THIS window (same session, no logout;
-    // just a reload). WhatsApp fills the message itself and does not send it.
-    status("Couldn't open it in place — reloading this window with the chat…");
-    location.href = "https://web.whatsapp.com/send?phone=" + digits + "&text=" + encodeURIComponent(text);
+    // Never reload WhatsApp. Hand the message over via the clipboard instead.
+    console.warn("WA Sender: could not open chat", failures);
+    await navigator.clipboard.writeText(text).catch(() => {});
+    status(`Couldn't open the chat with ${number} automatically. The message is copied: ` +
+           `open the chat yourself and paste (Ctrl+V / Cmd+V).\n\nDetails: ${failures.join(" | ")}`, "err");
+  }
+
+  // Open the chat through WhatsApp Web's own code (runs in the page via background.js).
+  async function openChatDirect(digits) {
+    const before = document.querySelector("#main");
+    const res = await chrome.runtime.sendMessage({ type: "openChat", digits });
+    if (!res || !res.ok) return (res && res.error) || "no response";
+    const key = digits.slice(-8);
+    const opened = await waitFor(() => {
+      const main = document.querySelector("#main");
+      if (!main || !main.querySelector('footer [contenteditable="true"]')) return null;
+      const header = main.querySelector("header");
+      // res.verified: WhatsApp itself confirmed this chat is now the active one.
+      return res.verified || main !== before || digitsOf(header && header.textContent).includes(key);
+    }, 4000);
+    return opened ? true : "chat did not open";
   }
 
   // ---------- WhatsApp DOM automation ----------
@@ -229,7 +256,7 @@
     const key = digits.slice(-8); // matches "+972 50-123-4567", "050-1234567", etc.
     const before = document.querySelector("#main");
     const btn = findNewChatButton();
-    if (!btn) return false;
+    if (!btn) return "New chat button not found";
     realClick(btn);
 
     // The "New chat" drawer focuses its search box when it opens.
@@ -237,7 +264,7 @@
       const a = document.activeElement;
       return isEditable(a) && outsideUs(a) ? a : null;
     }, 3000);
-    if (!search) return false;
+    if (!search) return "search box not found";
     typeInto(search, digits);
 
     // Wait for a result row that shows this number.
@@ -251,17 +278,18 @@
     }, 5000);
     if (!row) {
       document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-      return false;
+      return "number not found in search results";
     }
     realClick(row.querySelector('[role="button"], [tabindex]') || row);
 
     // Wait for the conversation to switch to that chat.
-    return !!(await waitFor(() => {
+    const opened = await waitFor(() => {
       const main = document.querySelector("#main");
       if (!main || !main.querySelector('footer [contenteditable="true"]')) return null;
       const header = main.querySelector("header");
       return main !== before || digitsOf(header && header.textContent).includes(key);
-    }, 4000));
+    }, 4000);
+    return opened ? true : "chat did not open after clicking the result";
   }
 
   async function fillComposer(text) {
