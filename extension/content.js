@@ -51,6 +51,8 @@
       .row { display: flex; gap: 6px; justify-content: flex-end; margin-top: 10px; }
       button.b { padding: 7px 12px; border-radius: 6px; border: 1px solid #ccc; background: #f5f5f5; cursor: pointer; }
       button.primary { background: #25d366; border-color: #1fae55; color: #fff; font-weight: 600; }
+      .reset { display: block; margin-top: 6px; font-size: 11px; color: #888; }
+      .fab { touch-action: none; }
       .status { margin-top: 8px; font-size: 12px; color: #555; min-height: 16px; white-space: pre-wrap; }
     </style>
     <div class="wrap">
@@ -66,6 +68,7 @@
           <button class="b primary" id="go">Open chat</button>
         </div>
         <div class="status" id="status"></div>
+        <a href="#" id="resetpos" class="reset">Reset button position</a>
       </div>
       <button class="fab" id="fab" title="WA Sender">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>
@@ -75,44 +78,108 @@
   const wrap = root.querySelector(".wrap");
   const panel = root.querySelector(".panel");
 
-  // Sit next to the "WhatsApp" title in the chat list header, panel dropping
-  // down. We only float above WhatsApp's header, never insert into its DOM,
-  // so its re-renders can't remove or break the button. No title found:
-  // bottom-left corner with the panel opening upwards.
-  function findTitle() {
-    const left = innerWidth / 2;
-    const candidates = document.querySelectorAll('h1, [role="heading"], [aria-label^="WhatsApp"], [title^="WhatsApp"]');
-    for (const el of candidates) {
-      if (host.contains(el) || el.closest("#main")) continue;
-      const name = (el.textContent || el.getAttribute("aria-label") || el.getAttribute("title") || "").trim();
-      if (!/^WhatsApp( Business)?$/.test(name)) continue;
-      const r = el.getBoundingClientRect();
-      if (r.width && r.height && r.height < 80 && r.left < left && r.top < 200) return el;
+  // Button position, in order of preference:
+  //  1. wherever you dragged it (remembered),
+  //  2. right of the "WhatsApp" title in the chat list header,
+  //  3. bottom-left corner.
+  // We only float above WhatsApp's page, never insert into its DOM, so its
+  // re-renders can't remove or break the button.
+  const POS_KEY = "wa-sender-button-pos";
+  let savedPos = null;
+  try { savedPos = JSON.parse(localStorage.getItem(POS_KEY)); } catch {}
+
+  // Find the "WhatsApp" title text: scan text nodes plus labelled elements
+  // (the title may be plain text in a div, or an SVG logo with a label).
+  let titleNode = null;
+  let lastScan = 0;
+  function titleRect() {
+    const valid = (r) => r && r.width && r.height > 12 && r.height < 80 && r.left < innerWidth / 2 && r.top < 220;
+    const rectOf = (n) => {
+      if (n.nodeType === Node.TEXT_NODE) {
+        const range = document.createRange();
+        range.selectNodeContents(n);
+        return range.getBoundingClientRect();
+      }
+      return n.getBoundingClientRect();
+    };
+    if (titleNode && titleNode.isConnected && valid(rectOf(titleNode))) return rectOf(titleNode);
+    if (Date.now() - lastScan < 2000) return null; // don't rescan the whole page too often
+    lastScan = Date.now();
+    titleNode = null;
+    const isTitle = (t) => /^\s*WhatsApp( Business)?\s*$/.test(t || "");
+    const found = [];
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT,
+      { acceptNode: (n) => (isTitle(n.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP) });
+    for (let n; (n = walker.nextNode());) found.push(n);
+    for (const el of document.querySelectorAll('[aria-label^="WhatsApp"], [title^="WhatsApp"], svg title')) {
+      if (isTitle(el.getAttribute("aria-label") || el.getAttribute("title") || el.textContent)) {
+        found.push(el.tagName.toLowerCase() === "title" ? el.parentNode : el);
+      }
     }
-    return null;
+    let best = null;
+    for (const n of found) {
+      const el = n.nodeType === Node.TEXT_NODE ? n.parentElement : n;
+      if (!el || host.contains(el) || el.closest("#main")) continue;
+      const r = rectOf(n);
+      if (valid(r) && (!best || r.height > best.r.height)) best = { n, r }; // biggest text = the title
+    }
+    if (!best) return null;
+    titleNode = best.n;
+    return best.r;
+  }
+
+  function setPos(left, top) {
+    left = Math.max(0, Math.min(left, innerWidth - 44));
+    top = Math.max(0, Math.min(top, innerHeight - 44));
+    host.style.left = Math.round(left) + "px";
+    host.style.top = Math.round(top) + "px";
+    host.style.bottom = "";
+    const below = top < innerHeight / 2; // open the panel towards the larger space
+    wrap.classList.toggle("below", below);
+    panel.style.maxHeight = Math.max(200, below ? innerHeight - top - 70 : top - 20) + "px";
   }
 
   function place() {
-    const title = findTitle();
-    if (title) {
-      // Measure the text itself: the heading box may be wider than its text.
-      const range = document.createRange();
-      range.selectNodeContents(title);
-      const r = range.getBoundingClientRect().width ? range.getBoundingClientRect() : title.getBoundingClientRect();
-      const top = Math.round(r.top + r.height / 2 - 20);
-      host.style.left = Math.round(Math.min(r.right + 14, innerWidth - 360)) + "px";
-      host.style.top = top + "px";
-      host.style.bottom = "";
-      wrap.classList.add("below");
-      panel.style.maxHeight = Math.max(200, innerHeight - top - 70) + "px";
-    } else {
-      host.style.left = "16px";
-      host.style.top = "";
-      host.style.bottom = "16px";
-      wrap.classList.remove("below");
-      panel.style.maxHeight = "";
-    }
+    if (dragging) return;
+    if (savedPos) return setPos(savedPos.left, savedPos.top);
+    const r = titleRect();
+    if (r) return setPos(r.right + 14, r.top + r.height / 2 - 20);
+    setPos(16, innerHeight - 56);
   }
+
+  // Drag the button to move it; a plain click still opens the panel.
+  let dragging = false;
+  let moved = false;
+  $("fab").addEventListener("pointerdown", (e) => {
+    const start = { x: e.clientX, y: e.clientY, left: host.offsetLeft, top: host.offsetTop };
+    dragging = true;
+    moved = false;
+    const onMove = (ev) => {
+      const dx = ev.clientX - start.x, dy = ev.clientY - start.y;
+      if (!moved && Math.hypot(dx, dy) < 5) return;
+      moved = true;
+      setPos(start.left + dx, start.top + dy);
+    };
+    const onUp = () => {
+      removeEventListener("pointermove", onMove);
+      removeEventListener("pointerup", onUp);
+      dragging = false;
+      if (moved) {
+        savedPos = { left: host.offsetLeft, top: host.offsetTop };
+        try { localStorage.setItem(POS_KEY, JSON.stringify(savedPos)); } catch {}
+      }
+    };
+    addEventListener("pointermove", onMove);
+    addEventListener("pointerup", onUp);
+  });
+  $("resetpos").addEventListener("click", (e) => {
+    e.preventDefault();
+    savedPos = null;
+    try { localStorage.removeItem(POS_KEY); } catch {}
+    lastScan = 0;
+    place();
+  });
+
   place();
   setInterval(place, 500);
   addEventListener("resize", place);
@@ -196,7 +263,7 @@
       $("phone").focus();
     }
   }
-  $("fab").addEventListener("click", togglePanel);
+  $("fab").addEventListener("click", () => { if (!moved) togglePanel(); });
   chrome.runtime.onMessage.addListener((msg) => { if (msg.type === "toggle") togglePanel(); });
   $("clear").addEventListener("click", () => {
     $("phone").value = "";

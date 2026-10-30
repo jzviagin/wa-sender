@@ -21,8 +21,8 @@ Any of these opens or closes the panel in your WhatsApp window:
 - Press **Cmd+E** on Mac (Ctrl+Shift+S on Windows). You can change this in
   `chrome://extensions/shortcuts`.
 - Click the green button next to the "WhatsApp" title at the top of the chat list.
-  If WhatsApp changes its header and the title can't be found, the button moves
-  to the bottom-left corner.
+  If it isn't where you want it, **drag it** anywhere and it stays there.
+  *Reset button position* at the bottom of the panel moves it back.
 
 It only runs on `web.whatsapp.com`.
 
