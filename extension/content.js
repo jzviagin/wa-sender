@@ -1,13 +1,6 @@
 // WA Sender: floating panel inside WhatsApp Web. Opens the chat for a number
 // in the current window and fills the templated message WITHOUT sending it.
 (() => {
-  // Only show the panel in the installed WhatsApp app window, not in normal tabs.
-  // Set to false if you also want it in regular tabs.
-  const ONLY_IN_APP_WINDOW = true;
-  const isAppWindow = ["standalone", "window-controls-overlay", "minimal-ui"]
-    .some((m) => matchMedia(`(display-mode: ${m})`).matches);
-  if (ONLY_IN_APP_WINDOW && !isAppWindow) return;
-
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const digitsOf = (s) => (s || "").replace(/\D/g, "");
 
@@ -32,7 +25,10 @@
   }
 
   // ---------- UI ----------
+  // Remove a stale panel left behind by an earlier copy (e.g. after an extension reload).
+  document.getElementById("wa-sender-host")?.remove();
   const host = document.createElement("div");
+  host.id = "wa-sender-host";
   host.style.cssText = "position:fixed;left:16px;bottom:16px;z-index:2147483647;";
   document.documentElement.appendChild(host);
   const root = host.attachShadow({ mode: "open" });
@@ -148,13 +144,15 @@
 
   $("phone").addEventListener("input", refresh);
   $("phone").addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
-  $("fab").addEventListener("click", async () => {
+  async function togglePanel() {
     wrap.classList.toggle("open");
     if (wrap.classList.contains("open")) {
       await reloadConfig(); // picks up config.json edits each time the panel opens
       $("phone").focus();
     }
-  });
+  }
+  $("fab").addEventListener("click", togglePanel);
+  chrome.runtime.onMessage.addListener((msg) => { if (msg.type === "toggle") togglePanel(); });
   $("clear").addEventListener("click", () => {
     $("phone").value = "";
     for (const i of fieldInputs()) i.value = "";

@@ -10,12 +10,18 @@ the box. **Nothing is sent**: you review it and press Enter yourself.
 1. Open `chrome://extensions` in Chrome.
 2. Turn on **Developer mode** (top right).
 3. Click **Load unpacked** and choose the `extension` folder.
-4. Reload your WhatsApp window (Ctrl+R / Cmd+R). A green button appears at the
-   bottom left.
+4. Click the puzzle-piece icon in Chrome's toolbar and pin **WA Sender**.
 
-It only runs on `web.whatsapp.com`, and the panel only shows up in the
-installed WhatsApp app window, not in normal tabs. To show it in tabs too, set
-`ONLY_IN_APP_WINDOW = false` at the top of `extension/content.js`.
+## Opening the panel
+
+Any of these opens or closes the panel in your WhatsApp window:
+
+- Click the **WA Sender** icon in Chrome's toolbar. If you're on another tab,
+  it switches to WhatsApp first.
+- Press **Alt+Shift+W**. You can change this in `chrome://extensions/shortcuts`.
+- Click the green round button at the bottom left of the WhatsApp page.
+
+It only runs on `web.whatsapp.com`.
 
 ## Setting the message: `extension/config.json`
 
