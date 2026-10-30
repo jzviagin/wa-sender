@@ -18,7 +18,7 @@ Any of these opens or closes the panel in your WhatsApp window:
 
 - Click the **WA Sender** icon in Chrome's toolbar. If you're on another tab,
   it switches to WhatsApp first.
-- Press **Control+Shift+S** (Ctrl+Shift+S on Windows). You can change this in
+- Press **Cmd+E** on Mac (Ctrl+Shift+S on Windows). You can change this in
   `chrome://extensions/shortcuts`.
 - Click the green round button at the bottom left of the WhatsApp page.
 
