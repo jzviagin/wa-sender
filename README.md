@@ -5,12 +5,14 @@ window. Paste a phone number (any format), fill in the fields, and click
 **Open chat**. The chat opens in the same window and the message is typed into
 the box. **Nothing is sent**: you review it and press Enter yourself.
 
-## Install (one time)
+## Install
 
-1. Open `chrome://extensions` in Chrome.
-2. Turn on **Developer mode** (top right).
-3. Click **Load unpacked** and choose the `extension` folder.
-4. Click the puzzle-piece icon in Chrome's toolbar and pin **WA Sender**.
+**From the Chrome Web Store** (no Developer mode): open the store link for
+WA Sender and click **Add to Chrome**. Publishing steps are in [STORE.md](STORE.md).
+
+**From this folder** (for testing changes): in `chrome://extensions`, turn on
+**Developer mode**, click **Load unpacked**, and choose the `extension` folder.
+Don't keep both installed at once, or they'll fight over the panel.
 
 ## Opening the panel
 
@@ -32,26 +34,20 @@ It only runs on `web.whatsapp.com`.
 - After the chat opens with the message, the fields clear for the next customer.
   If the chat couldn't be opened, they stay filled so you can try again.
 
-## Setting the message: `extension/config.json`
+## Setting the message
 
-```json
-{
-  "message": "שלום {שם הלקוח},\nהטכנאי שלנו בדרך אליך לרחוב {רחוב}.\nזמן הגעה משוער: {שעה}",
-  "params": ["שם הלקוח", "רחוב", "שעה"]
-}
-```
+Click **Settings** at the bottom of the panel (or right-click the toolbar icon
+→ **Options**).
 
-- `params`: one input field per name, in this order. The name is the field's
-  label. Add as many as you want.
-- `message`: the text. Put `{param name}` wherever a value goes, spelled exactly
-  as in `params`. Use `\n` for a new line.
-- The phone number isn't a param. It always has its own field at the top.
+- **Fields:** one per line. Each becomes an input in the panel, in that order,
+  with its name as the label. Add as many as you want. The phone number always
+  has its own field and isn't one of them.
+- **Message:** put `{field name}` wherever a value goes. Click a field's button
+  to insert it at the cursor.
 
-Changes apply the next time you open the panel. If they don't show up, click
-the reload arrow on WA Sender's card in `chrome://extensions`.
-
-The preview highlights params you haven't filled in yet. The panel warns you if
-the message uses a `{name}` that isn't listed in `params`.
+Settings sync to every computer where you're signed in to Chrome. If the panel
+is open when you save, it updates right away. The panel's preview highlights
+fields you haven't filled in yet.
 
 ## How it opens the chat
 
@@ -73,5 +69,6 @@ different country code is left alone. The panel warns you if the length looks wr
 
 ## Development
 
+- Build the store upload: `./package.sh` (creates `dist/wa-sender-<version>.zip`)
 - Phone tests: `node extension/phone.test.js`
 - Regenerate icons: `python3 make_icon.py` (needs Pillow)

@@ -1,0 +1,47 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>WA Sender settings</title>
+<style>
+  body { font: 14px system-ui, sans-serif; max-width: 640px; margin: 32px auto; padding: 0 16px; color: #111; background: #fff; }
+  h1 { font-size: 20px; }
+  label { display: block; font-weight: 600; margin: 20px 0 6px; }
+  .hint { color: #666; font-size: 12px; margin: 4px 0; }
+  textarea { width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid #ccc; border-radius: 6px; font: inherit; }
+  #message { height: 140px; }
+  #params { height: 110px; }
+  .chips button { margin: 4px 4px 0 0; padding: 3px 10px; border-radius: 12px; border: 1px solid #1fae55; background: #e9f9ef; cursor: pointer; }
+  .preview { margin-top: 6px; padding: 10px; border-radius: 8px; background: #dcf8c6; white-space: pre-wrap; }
+  .warn { color: #b36b00; margin-top: 8px; }
+  .row { margin-top: 20px; display: flex; gap: 8px; align-items: center; }
+  .row button { padding: 8px 16px; border-radius: 6px; border: 1px solid #ccc; background: #f5f5f5; cursor: pointer; }
+  .row button.primary { background: #25d366; border-color: #1fae55; color: #fff; font-weight: 600; }
+  #saved { color: #1a7f37; }
+</style>
+</head>
+<body>
+  <h1>WA Sender settings</h1>
+
+  <label for="params">Fields</label>
+  <div class="hint">One per line. Each becomes an input in the panel, in this order. The phone number always has its own field.</div>
+  <textarea id="params" dir="auto"></textarea>
+
+  <label for="message">Message</label>
+  <div class="hint">Put <code>{field name}</code> wherever a value goes. Click a field to insert it at the cursor.</div>
+  <div class="chips" id="chips"></div>
+  <textarea id="message" dir="auto"></textarea>
+
+  <label>Preview</label>
+  <div class="preview" id="preview" dir="auto"></div>
+  <div class="warn" id="warn"></div>
+
+  <div class="row">
+    <button class="primary" id="save">Save</button>
+    <button id="reset">Restore default</button>
+    <span id="saved"></span>
+  </div>
+  <script src="config.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

@@ -13,17 +13,6 @@
     return null;
   }
 
-  // ---------- config.json ----------
-  let config = { message: "", params: [] };
-  async function loadConfig() {
-    const res = await fetch(chrome.runtime.getURL("config.json"), { cache: "no-store" });
-    const cfg = await res.json();
-    if (typeof cfg.message !== "string" || !Array.isArray(cfg.params)) {
-      throw new Error('config.json needs "message" (text) and "params" (list of names)');
-    }
-    return { message: cfg.message, params: cfg.params.map(String) };
-  }
-
   // ---------- UI ----------
   // Remove a stale panel left behind by an earlier copy (e.g. after an extension reload).
   document.getElementById("wa-sender-host")?.remove();
@@ -51,7 +40,8 @@
       .row { display: flex; gap: 6px; justify-content: flex-end; margin-top: 10px; }
       button.b { padding: 7px 12px; border-radius: 6px; border: 1px solid #ccc; background: #f5f5f5; cursor: pointer; }
       button.primary { background: #25d366; border-color: #1fae55; color: #fff; font-weight: 600; }
-      .reset { display: block; margin-top: 6px; font-size: 11px; color: #888; }
+      .links { display: flex; justify-content: space-between; margin-top: 6px; }
+      .links a { font-size: 11px; color: #888; }
       .fab { touch-action: none; }
       .status { margin-top: 8px; font-size: 12px; color: #555; min-height: 16px; white-space: pre-wrap; }
     </style>
@@ -68,7 +58,7 @@
           <button class="b primary" id="go">Open chat</button>
         </div>
         <div class="status" id="status"></div>
-        <a href="#" id="resetpos" class="reset">Reset button position</a>
+        <div class="links"><a href="#" id="settings">Settings</a><a href="#" id="resetpos">Reset button position</a></div>
       </div>
       <button class="fab" id="fab" title="WA Sender">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>
@@ -172,6 +162,14 @@
     addEventListener("pointermove", onMove);
     addEventListener("pointerup", onUp);
   });
+  $("settings").addEventListener("click", (e) => {
+    e.preventDefault();
+    chrome.runtime.sendMessage({ type: "openSettings" });
+  });
+  // Settings saved while the panel is open: rebuild the fields right away.
+  chrome.storage.onChanged.addListener((changes) => {
+    if (changes.config && wrap.classList.contains("open")) reloadConfig();
+  });
   $("resetpos").addEventListener("click", (e) => {
     e.preventDefault();
     savedPos = null;
@@ -190,7 +188,7 @@
     wrap.addEventListener(ev, (e) => e.stopPropagation());
   }
 
-  // Rebuild the fields from config.json, keeping values already typed.
+  // Rebuild the fields from the settings, keeping values already typed.
   function buildFields() {
     const old = Object.fromEntries(fieldInputs().map((i) => [i.dataset.param, i.value]));
     const box = $("fields");
@@ -241,14 +239,13 @@
 
   async function reloadConfig() {
     try {
-      config = await loadConfig();
+      config = await getConfig();
       buildFields();
-      const unknown = [...config.message.matchAll(/\{([^{}]+)\}/g)]
-        .map((m) => m[1]).filter((n) => !config.params.includes(n));
-      status(unknown.length ? `⚠ config.json: message uses {${unknown.join("}, {")}} but it's not in "params"` : "",
+      const unknown = unknownPlaceholders(config);
+      status(unknown.length ? `⚠ The message uses {${unknown.join("}, {")}}, which isn't a field (see Settings)` : "",
              unknown.length ? "warn" : "");
     } catch (e) {
-      status("Can't read config.json: " + e.message, "err");
+      status("Can't load settings: " + e.message, "err");
     }
     refresh();
   }
@@ -266,7 +263,7 @@
   async function togglePanel() {
     wrap.classList.toggle("open");
     if (wrap.classList.contains("open")) {
-      await reloadConfig(); // picks up config.json edits each time the panel opens
+      await reloadConfig(); // picks up settings changes each time the panel opens
       $("phone").focus();
     }
   }

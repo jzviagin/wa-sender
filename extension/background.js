@@ -60,6 +60,7 @@ async function openChatInPage(digits) {
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.type === "openSettings") return void chrome.runtime.openOptionsPage();
   if (msg.type !== "openChat" || !sender.tab) return;
   chrome.scripting
     .executeScript({
