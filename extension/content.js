@@ -260,8 +260,13 @@
     if (next) next.focus();
     else go();
   });
+  // After the extension is updated, this copy of the panel is cut off from it.
+  const alive = () => { try { return !!chrome.runtime.id; } catch { return false; } };
+  const STALE = "WA Sender was updated. Press Cmd+E or click its toolbar icon to load the new version.";
+
   async function togglePanel() {
     wrap.classList.toggle("open");
+    if (!alive()) return status(STALE, "err");
     if (wrap.classList.contains("open")) {
       await reloadConfig(); // picks up settings changes each time the panel opens
       $("phone").focus();
@@ -286,6 +291,7 @@
   $("go").addEventListener("click", go);
 
   async function go() {
+    if (!alive()) return status(STALE, "err");
     const { number, warning } = normalizePhone($("phone").value);
     if (!number) return status("Enter a phone number.");
     if (warning && !confirm(`${number}\n${warning}\n\nOpen anyway?`)) return;
@@ -311,6 +317,9 @@
           wrap.classList.remove("open");
           return;
         }
+        if (String(result).includes("isn't on WhatsApp")) {
+          return status(`${number} isn't on WhatsApp.`, "err");
+        }
         failures.push(`${label}: ${result}`);
       }
     } catch (e) {
@@ -319,7 +328,7 @@
       $("go").disabled = false;
     }
     // Never reload WhatsApp. Hand the message over via the clipboard instead.
-    console.warn("WA Sender: could not open chat", failures);
+    console.info("WA Sender: could not open chat", failures);
     await navigator.clipboard.writeText(text).catch(() => {});
     status(`Couldn't open the chat with ${number} automatically. The message is copied: ` +
            `open the chat yourself and paste (Ctrl+V / Cmd+V).\n\nDetails: ${failures.join(" | ")}`, "err");
@@ -351,11 +360,29 @@
   const isEditable = (el) => el && (el.isContentEditable || el.tagName === "INPUT");
   const outsideUs = (el) => el && el !== host && !el.closest("#main");
 
+  const visible = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+  const notOurs = (el) => !host.contains(el) && !el.closest("#main");
+
   function findNewChatButton() {
-    const icons = ["new-chat-outline", "new-chat", "chat", "new-chat-icon"];
-    for (const name of icons) {
-      const icon = document.querySelector(`[data-icon="${name}"]`);
-      if (icon) return icon.closest('button, [role="button"]') || icon;
+    const selectors = ['[data-icon="new-chat-outline"]', '[data-icon*="new-chat"]', '[data-icon*="chat-plus"]',
+      '[aria-label="New chat"]', '[title="New chat"]', '[aria-label="צ\'אט חדש"]', '[title="צ\'אט חדש"]'];
+    for (const sel of selectors) {
+      for (const el of document.querySelectorAll(sel)) {
+        if (visible(el) && notOurs(el)) return el.closest('button, [role="button"]') || el;
+      }
+    }
+    return null;
+  }
+
+  // The chat list's own search box ("Search or start a new chat").
+  function findSearchBox() {
+    const editable = 'input:not([type]), input[type="text"], input[type="search"], [contenteditable="true"]';
+    const candidates = [
+      ...document.querySelectorAll('[aria-label*="Search" i], [placeholder*="Search" i], [aria-label*="חיפוש"], [placeholder*="חיפוש"]'),
+      ...document.querySelectorAll("#side input, #side [contenteditable='true']"),
+    ];
+    for (const el of candidates) {
+      if (el.matches(editable) && visible(el) && notOurs(el)) return el;
     }
     return null;
   }
@@ -375,17 +402,19 @@
   async function openChatInPlace(digits) {
     const key = digits.slice(-8); // matches "+972 50-123-4567", "050-1234567", etc.
     const before = document.querySelector("#main");
-    const btn = findNewChatButton();
-    if (!btn) return "New chat button not found";
-    realClick(btn);
-
-    // The "New chat" drawer focuses its search box when it opens.
-    const search = await waitFor(() => {
-      const a = document.activeElement;
-      return isEditable(a) && outsideUs(a) ? a : null;
-    }, 3000);
-    if (!search) return "search box not found";
-    typeInto(search, digits);
+    let search = findSearchBox();
+    if (!search) {
+      const btn = findNewChatButton();
+      if (!btn) return "search box and New chat button not found";
+      realClick(btn);
+      // The "New chat" drawer focuses its search box when it opens.
+      search = await waitFor(() => {
+        const a = document.activeElement;
+        return isEditable(a) && outsideUs(a) ? a : null;
+      }, 3000);
+      if (!search) return "search box not found";
+    }
+    typeInto(search, "+" + digits);
 
     // Wait for a result row that shows this number.
     const row = await waitFor(() => {

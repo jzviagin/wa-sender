@@ -1,5 +1,5 @@
 // Message and fields, stored in Chrome sync storage (edited on the settings page).
-const DEFAULT_CONFIG = {
+var DEFAULT_CONFIG = { // var: the file may be injected again into the same page
   message: "אהלן {שם הלקוח},\nזה קובי זיו, מקווה שהכל טוב אצלך :)\nהדירה ב{רחוב} מתפנה להשכרה בחודשים הקרובים?",
   params: ["שם הלקוח", "רחוב"],
 };

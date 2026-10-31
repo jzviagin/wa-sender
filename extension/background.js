@@ -7,7 +7,7 @@ async function togglePanel(tab) {
     await chrome.tabs.sendMessage(tab.id, { type: "toggle" });
   } catch {
     // Page was open before the extension was installed/reloaded: inject now.
-    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["phone.js", "content.js"] });
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["config.js", "phone.js", "content.js"] });
     await chrome.tabs.sendMessage(tab.id, { type: "toggle" });
   }
 }
@@ -30,6 +30,8 @@ self.handleClick = handleClick; // for tests
 // Returns {ok, verified} or {ok: false, error}.
 async function openChatInPage(digits) {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const msg = (e) => (e && e.message ? e.message : String(e));
+  let step = "modules";
   try {
     if (typeof window.require !== "function") return { ok: false, error: "WhatsApp modules not reachable" };
     const mod = (name) => {
@@ -42,9 +44,44 @@ async function openChatInPage(digits) {
       return { ok: false, error: "WhatsApp modules changed (WidFactory/FindChat/Cmd missing)" };
     }
     const wid = WidFactory.createWid(digits + "@c.us");
-    const found = await FindChat.findOrCreateLatestChat(wid);
-    const chat = (found && found.chat) || found;
-    if (!chat) return { ok: false, error: "no chat for this number" };
+
+    // Look the number up on WhatsApp's servers first. Besides telling us whether
+    // it's on WhatsApp, this stores its LID (WhatsApp's newer internal id);
+    // without it, opening a chat with a new number fails with "No LID for user".
+    step = "lookup";
+    const ids = [];
+    let lookupError = "";
+    const Exists = mod("WAWebQueryExistsJob");
+    if (Exists) {
+      try {
+        const res = typeof Exists.queryWidExists === "function" ? await Exists.queryWidExists(wid)
+          : typeof Exists.queryExists === "function" ? await Exists.queryExists(digits) : undefined;
+        if (res === null) return { ok: false, error: "this number isn't on WhatsApp" };
+        if (res && res.wid) ids.push(res.wid);
+        if (res && res.lid) ids.push(res.lid);
+      } catch (e) {
+        lookupError = " (lookup: " + msg(e) + ")";
+      }
+    } else {
+      lookupError = " (lookup module missing)";
+    }
+    ids.push(wid);
+
+    step = "find chat";
+    let chat = null;
+    let findError = null;
+    for (const id of ids) {
+      try {
+        const found = await FindChat.findOrCreateLatestChat(id);
+        chat = (found && found.chat) || found;
+        if (chat) break;
+      } catch (e) {
+        findError = e;
+      }
+    }
+    if (!chat) return { ok: false, error: `WhatsApp (find chat): ${findError ? msg(findError) : "no chat"}${lookupError}` };
+
+    step = "open";
     const Cmd = CmdMod.Cmd || CmdMod;
     const isActive = () => chat.active === true;
     try {
@@ -55,9 +92,18 @@ async function openChatInPage(digits) {
     for (let i = 0; i < 20 && !isActive(); i++) await sleep(100);
     return { ok: true, verified: isActive() };
   } catch (e) {
-    return { ok: false, error: "WhatsApp: " + (e && e.message ? e.message : String(e)) };
+    return { ok: false, error: `WhatsApp (${step}): ${msg(e)}` };
   }
 }
+
+// After install/update, swap the panel in open WhatsApp tabs for the new
+// version (the old copy is cut off from the extension and can't work).
+chrome.runtime.onInstalled.addListener(async () => {
+  const tabs = await chrome.tabs.query({ url: WA_URL + "*" });
+  for (const tab of tabs) {
+    chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["config.js", "phone.js", "content.js"] }).catch(() => {});
+  }
+});
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "openSettings") return void chrome.runtime.openOptionsPage();
