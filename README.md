@@ -26,6 +26,12 @@ Any of these opens or closes the panel in your WhatsApp window:
 
 It only runs on `web.whatsapp.com`.
 
+## Using the panel
+
+- **Enter** moves to the next field. On the last field it opens the chat.
+- After the chat opens with the message, the fields clear for the next customer.
+  If the chat couldn't be opened, they stay filled so you can try again.
+
 ## Setting the message: `extension/config.json`
 
 ```json

@@ -205,7 +205,6 @@
       input.dataset.param = name;
       input.value = old[name] || "";
       input.addEventListener("input", refresh);
-      input.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
       box.append(label, input);
     }
   }
@@ -255,7 +254,15 @@
   }
 
   $("phone").addEventListener("input", refresh);
-  $("phone").addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
+  // Enter moves to the next field; on the last field it opens the chat.
+  panel.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" || e.isComposing || e.target.tagName !== "INPUT") return;
+    e.preventDefault();
+    const inputs = [$("phone"), ...fieldInputs()];
+    const next = inputs[inputs.indexOf(e.target) + 1];
+    if (next) next.focus();
+    else go();
+  });
   async function togglePanel() {
     wrap.classList.toggle("open");
     if (wrap.classList.contains("open")) {
@@ -265,11 +272,14 @@
   }
   $("fab").addEventListener("click", () => { if (!moved) togglePanel(); });
   chrome.runtime.onMessage.addListener((msg) => { if (msg.type === "toggle") togglePanel(); });
-  $("clear").addEventListener("click", () => {
+  function clearFields() {
     $("phone").value = "";
     for (const i of fieldInputs()) i.value = "";
-    status("");
     refresh();
+  }
+  $("clear").addEventListener("click", () => {
+    clearFields();
+    status("");
     $("phone").focus();
   });
   $("copy").addEventListener("click", async () => {
@@ -300,6 +310,7 @@
         if (result === true) {
           await fillComposer(text);
           status(`Ready in chat with ${number} — review it and press Enter in WhatsApp.`);
+          clearFields();
           wrap.classList.remove("open");
           return;
         }
