@@ -1,6 +1,6 @@
 # WA Sender
 
-A Chrome extension that adds a small panel inside your open WhatsApp Web app
+A Chrome and Safari extension that adds a small panel inside your open WhatsApp Web app
 window. Paste a phone number (any format), fill in the fields, and click
 **Open chat**. The chat opens in the same window and the message is typed into
 the box. **Nothing is sent**: you review it and press Enter yourself.
@@ -13,6 +13,26 @@ WA Sender and click **Add to Chrome**. Publishing steps are in [STORE.md](STORE.
 **From this folder** (for testing changes): in `chrome://extensions`, turn on
 **Developer mode**, click **Load unpacked**, and choose the `extension` folder.
 Don't keep both installed at once, or they'll fight over the panel.
+
+**Safari** (Mac, Safari 16.4 or later): Safari extensions come inside a small Mac
+app, built from the same `extension` folder.
+
+1. Open `safari/WA Sender/WA Sender.xcodeproj` in Xcode.
+2. Select the **WA Sender** project → each of the two targets → *Signing & Capabilities*,
+   and pick your Apple ID as the **Team** (a free account works).
+3. Press **Run**. In Safari → *Settings* → *Extensions*, turn on **WA Sender**
+   and allow it on `web.whatsapp.com`.
+4. If WA Sender isn't listed there, turn on *Develop* → *Developer Settings* →
+   **Allow unsigned extensions**. Safari turns this off when it quits, so you'd
+   need it again after restarting Safari.
+
+After changing the extension, press **Run** again (or run `./safari.sh`).
+
+Differences in Safari:
+
+- Settings stay on that Mac; they don't sync to your other Macs.
+- Cmd+E is also Safari's *Use Selection for Find*. If it doesn't open the panel,
+  use the toolbar icon or the green button.
 
 ## Opening the panel
 
@@ -70,5 +90,9 @@ different country code is left alone. The panel warns you if the length looks wr
 ## Development
 
 - Build the store upload: `./package.sh` (creates `dist/wa-sender-<version>.zip`)
+- Build the Safari app: `./safari.sh` (prints the path to `WA Sender.app`).
+  The Xcode project points at the files in `extension/` rather than copying them.
+  If you add a new file to `extension/`, also add it in Xcode: drag it into the
+  project without *Copy items if needed*, and tick the **WA Sender Extension** target.
 - Phone tests: `node extension/phone.test.js`
 - Regenerate icons: `python3 make_icon.py` (needs Pillow)
