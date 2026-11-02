@@ -115,7 +115,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       func: openChatInPage,
       args: [msg.digits],
     })
-    .then(([r]) => sendResponse(r.result))
+    // Older Safari returns the value itself instead of [{ result }].
+    .then((res) => sendResponse(Array.isArray(res) ? res[0].result : res))
     .catch((e) => sendResponse({ ok: false, error: e.message }));
   return true; // async response
 });
